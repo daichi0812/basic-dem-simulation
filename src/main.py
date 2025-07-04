@@ -2,42 +2,35 @@ import tkinter as tk
 import random
 import time
 
-# パラメータ設定
-WIN_X, WIN_Y = 800, 800
-DT = 1e-4
-UPDATES_PER_FRAME = 10  # 1フレームあたりに実行する計算ステップ数
-PARTICLE_RADIUS_PX = 10    # 粒子の半径（ピクセル単位）
-# 半径を正規化座標(0.0 ~ 1.0)に変換
-PARTICLE_RADIUS_NORM = PARTICLE_RADIUS_PX / WIN_X
-NUM_PARTICLES = 300 # 粒子の数
+# パラメータ
+WIN_X, WIN_Y = 800, 800 # ウィンドウ
+DT = 1e-4   # 極小時間
+UPDATES_PER_FRAME = 10  # 1フレームごとの計算回数
+PARTICLE_RADIUS_PX = 15 # 粒子の半径（ピクセル）
+PARTICLE_RADIUS_NORM = PARTICLE_RADIUS_PX / WIN_X   # 粒子の半径（正規化座標）
+PARTICLES_NUM = 300  # 粒子の数
 
 # 物理状態変数
-# 重力ベクトル
-gravity = [0.0, -9.8]   # 重力ベクトル
-restitution = 0.8   # 反発係数
+gravity = [0.0, -9.8]   # 重力
+restitution = 0.8   #　反発係数
 
 # グローバル変数
-particles = []  # すべての粒子オブジェクトを格納するリスト
-# FPS計算用の変数を追加
+particles = []  # 粒子のリスト
+# FPS計算用の変数
 last_time = 0
 frame_count = 0
 fps = 0
 
-# 粒子のクラス
 class Particle:
-    def __init__(self, x, y, vx, vy, radius_norm, color, canvas):
+    def __init__(self, x, y, vx, vy, radius, color, canvas):
         self.pos = [x, y]
         self.vel = [vx, vy]
-        self.radius = radius_norm
+        self.radius = radius
         self.color = color
         self.canvas = canvas
-
-        # 描画用のID、最初はNoneにしておき、draw関数で作成する
-        self.id = None
-
+        self.id = None  # 描画用のID、最初はNoneにしておき、draw関数で作成
     def update_physics(self):
-        # 粒子の物理状態を1ステップ更新する
-        # 速度の更新（重力の影響）
+        # 速度の更新
         self.vel[0] += DT * gravity[0]
         self.vel[1] += DT * gravity[1]
 
@@ -48,25 +41,25 @@ class Particle:
         # 壁との衝突判定と処理
         # 右壁
         if self.pos[0] + self.radius > 1.0:
-            self.pos[0] = 1 - self.radius
+            self.pos[0] = 1.0 - self.radius
             self.vel[0] *= -restitution
         # 左壁
-        if self.pos[0] - self.radius < 0.0:
+        if self.pos[0] - self.radius < 0:
             self.pos[0] = self.radius
             self.vel[0] *= -restitution
         # 天井
-        if self.pos[1] + self.radius > 1.0:
-            self.pos[1] = 1 - self.radius
+        if self.pos[1] + self.radius > 1:
+            self.pos[1] = 1.0 - self.radius
             self.vel[1] *= -restitution
         # 床
-        if self.pos[1] - self.radius < 0.0:
+        if self.pos[1] - self.radius < 0:
             self.pos[1] = self.radius
             self.vel[1] *= -restitution
 
     def draw(self):
-        # 現在の粒子の位置をキャンバスに描画する
+        # 現在の粒子の位置をキャンバスに描画する(正規 -> ピクセル化)
         px = self.pos[0] * WIN_X
-        py = (1.0 - self.pos[1]) * WIN_Y
+        py = (1 - self.pos[1]) * WIN_Y
 
         x0 = px - PARTICLE_RADIUS_PX
         y0 = py - PARTICLE_RADIUS_PX
@@ -80,8 +73,8 @@ class Particle:
             self.canvas.coords(self.id, x0, y0, x1, y1)
 
 # 関数定義
-def initialize_particles():
-    # 指定された数の粒子をランダムな位置、速度で生成する
+# 粒子の初期化
+def particles_init():
     global particles
     particles = []
 
@@ -91,8 +84,7 @@ def initialize_particles():
         "#F7B267", "#F79D65", "#F4845F", "#F27059", "#F25C54"
     ]
 
-    for _ in range(NUM_PARTICLES):
-        # ランダムな初期位置と初期速度
+    for _ in range(PARTICLES_NUM):
         x = random.uniform(0.1, 0.9)
         y = random.uniform(0.1, 0.9)
         vx = random.uniform(-0.5, 0.5)
@@ -100,10 +92,10 @@ def initialize_particles():
 
         # カラーをランダムに選択
         color = random.choice(color_palette)
-
         p = Particle(x, y, vx, vy, PARTICLE_RADIUS_NORM, color, canvas)
         particles.append(p)
 
+# メインループ
 def main_loop():
     global last_time, frame_count, fps
 
@@ -113,7 +105,7 @@ def main_loop():
     # 1秒以上経過したらFPSを計算して表示を更新
     if current_time - last_time > 1.0:
         fps = frame_count / (current_time - last_time)
-        window.title(f"Basic DEM Simulator - FPS: {fps:.1f}")
+        window.title(f"Basic DEM Simulator - FPS: {fps:.2f}")
         frame_count = 0
         last_time = current_time
 
@@ -126,21 +118,21 @@ def main_loop():
     for p in particles:
         p.draw()
 
-    # 1ミリ秒に再度この関数を呼び出し、可能な限り高速にループさせる
+    # 1msごとにこの関数を呼び出し、可能な限り高速にループさせる
     window.after(1, main_loop)
 
 # GUIセットアップと実行
 window = tk.Tk()
 window.title("Basic DEM Simulator")
 window.geometry(f"{WIN_X}x{WIN_Y}")
-window.resizable(False, False)  # ウィンドウサイズを固定
+window.resizable(False, False)
 
 # キャンバスの作成
 canvas = tk.Canvas(window, width=WIN_X, height=WIN_Y, bg="#4D4D4D", highlightthickness=0)
 canvas.pack()
 
 # 初期化
-initialize_particles()
+particles_init()
 
 # メインループを開始
 main_loop()
