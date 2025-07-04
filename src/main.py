@@ -12,8 +12,9 @@ NUM_PARTICLES = 30  # 粒子の数
 
 # 物理状態変数
 gravity = [0.0, -9.8]   # 重力
-restitution = 0.8   #　反発係数
-K_SPRING = 5000.0 # 粒子間の反発係数（バネ定数）
+restitution = 0.8       #　反発係数
+K_SPRING = 5000.0       # 粒子間の反発係数（バネ定数）
+K_DAMPING = 50.0        # 衝突時の減衰係数を追加
 
 # グローバル変数
 particles = []  # 粒子のリスト
@@ -124,12 +125,22 @@ def handle_particle_collisions():
                 dist = dist_sq**0.5
                 overlap = sum_radii - dist
 
-                # 反発力（バネ力）を計算（大きさ）
-                force_magnitude = K_SPRING * overlap
-
                 # 力の方向（p1からp2へ）（向き）
                 norm_x = dist_x / dist
                 norm_y = dist_y / dist
+
+                # 反発力（バネ力）を計算（大きさ）
+                force_spring = K_SPRING * overlap
+
+                # 減衰力を計算
+                rel_vel_x = p2.vel[0] - p1.vel[0]
+                rel_vel_y = p2.vel[1] - p1.vel[1]
+                # 接触方向の相対速度
+                rel_vel_dot_norm = rel_vel_x * norm_x + rel_vel_y * norm_y
+                force_damping = K_DAMPING * rel_vel_dot_norm
+
+                # 合力 = バネ力 - 減衰力
+                force_magnitude = force_spring - force_damping
 
                 # 両方の粒子に力を加える（作用・反作用）
                 force_vec = [force_magnitude * norm_x, force_magnitude * norm_y]
