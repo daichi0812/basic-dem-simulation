@@ -6,15 +6,15 @@ import time
 WIN_X, WIN_Y = 800, 800 # ウィンドウ
 DT = 1e-4   # 極小時間
 UPDATES_PER_FRAME = 10  # 1フレームごとの計算回数
-PARTICLE_RADIUS_PX = 15 # 粒子の半径（ピクセル）
+PARTICLE_RADIUS_PX = 10 # 粒子の半径（ピクセル）
 PARTICLE_RADIUS_NORM = PARTICLE_RADIUS_PX / WIN_X   # 粒子の半径（正規化座標）
-NUM_PARTICLES = 100 # 粒子の数
+NUM_PARTICLES = 100  # 粒子の数
 
 # 物理状態変数
 GRAVITY = [0.0, -9.8]   # 重力
 K_SPRING = 30000.0      # 粒子間の反発係数（バネ定数）
 K_DAMPING = 50.0        # 衝突時の減衰係数を追加
-CoF = 0.2               # 摩擦係数
+RESTITUTION = 0.8
 
 
 # グローバル変数
@@ -91,6 +91,24 @@ class Particle:
         # 位置の更新
         self.pos[0] += self.vel[0] * DT
         self.pos[1] += self.vel[1] * DT
+
+        # 境界での衝突判定
+        # 天井
+        if self.pos[1] + self.radius > 1.0:
+            self.pos[1] = 1.0 - self.radius
+            self.vel[1] *= -RESTITUTION
+        # 床
+        if self.pos[1] - self.radius < 0:
+            self.pos[1] = self.radius
+            self.vel[1] *= -RESTITUTION
+        # 右壁
+        if self.pos[0] + self.radius > 1.0:
+            self.pos[0] = 1.0 - self.radius
+            self.vel[0] *= -RESTITUTION
+        # 左壁
+        if self.pos[0] - self.radius < 0:
+            self.pos[0] = self.radius
+            self.vel[0] *= -RESTITUTION
 
     def draw(self):
         # 現在の粒子の位置をキャンバスに描画する(正規 -> ピクセル化)
@@ -175,73 +193,6 @@ def handle_particle_collisions(grid):
                 p1.apply_force([-force_vec[0], -force_vec[1]])    # force_vecの向きが p1 -> p2 故
                 p2.apply_force(force_vec)
 
-# 壁との衝突力
-def handle_wall_forces(p):
-    # --- 床との衝突 (法線: 上向き [0, 1]) ---
-    overlap = p.radius - p.pos[1]
-    if overlap > 0:
-        # 法線力 = バネ力(上向き) + 減衰力(上向き)
-        normal_force = K_SPRING * overlap - K_DAMPING * p.vel[1]
-        if normal_force > 0:
-            p.apply_force([0, normal_force])
-            # 摩擦力 (速度と逆向き)
-            friction_force_magnitude = CoF * normal_force
-            tangential_vel = p.vel[0]
-            # 静止摩擦と動摩擦を考慮
-            if abs(tangential_vel) * p.mass / DT < friction_force_magnitude:
-                p.apply_force([-tangential_vel * p.mass / DT, 0])
-            else:
-                direction = -1 if tangential_vel > 0 else 1
-                p.apply_force([friction_force_magnitude * direction, 0])
-
-    # --- 天井との衝突 (法線: 下向き [0, -1]) ---
-    overlap = (p.pos[1] + p.radius) - 1.0
-    if overlap > 0:
-        # 法線力 = バネ力(下向き) + 減衰力(下向き)
-        normal_force = K_SPRING * overlap + K_DAMPING * p.vel[1]
-        if normal_force > 0:
-            p.apply_force([0, -normal_force])
-            # 摩擦力
-            friction_force_magnitude = CoF * normal_force
-            tangential_vel = p.vel[0]
-            if abs(tangential_vel) * p.mass / DT < friction_force_magnitude:
-                p.apply_force([-tangential_vel * p.mass / DT, 0])
-            else:
-                direction = -1 if tangential_vel > 0 else 1
-                p.apply_force([friction_force_magnitude * direction, 0])
-
-    # --- 左壁との衝突 (法線: 右向き [1, 0]) ---
-    overlap = p.radius - p.pos[0]
-    if overlap > 0:
-        # 法線力 = バネ力(右向き) + 減衰力(右向き)
-        normal_force = K_SPRING * overlap - K_DAMPING * p.vel[0]
-        if normal_force > 0:
-            p.apply_force([normal_force, 0])
-            # 摩擦力
-            friction_force_magnitude = CoF * normal_force
-            tangential_vel = p.vel[1]
-            if abs(tangential_vel) * p.mass / DT < friction_force_magnitude:
-                p.apply_force([0, -tangential_vel * p.mass / DT])
-            else:
-                direction = -1 if tangential_vel > 0 else 1
-                p.apply_force([0, friction_force_magnitude * direction])
-
-    # --- 右壁との衝突 (法線: 左向き [-1, 0]) ---
-    overlap = (p.pos[0] + p.radius) - 1.0
-    if overlap > 0:
-        # 法線力 = バネ力(左向き) + 減衰力(左向き)
-        normal_force = K_SPRING * overlap + K_DAMPING * p.vel[0]
-        if normal_force > 0:
-            p.apply_force([-normal_force, 0])
-            # 摩擦力
-            friction_force_magnitude = CoF * normal_force
-            tangential_vel = p.vel[1]
-            if abs(tangential_vel) * p.mass / DT < friction_force_magnitude:
-                p.apply_force([0, -tangential_vel * p.mass / DT])
-            else:
-                direction = -1 if tangential_vel > 0 else 1
-                p.apply_force([0, friction_force_magnitude * direction])
-
 # メインループ
 def main_loop():
     global last_time, frame_count, fps,sum_fps, update_count, average_fps
@@ -273,10 +224,6 @@ def main_loop():
 
         # 粒子間の衝突力を計算して加える
         handle_particle_collisions(grid)
-
-        # 衝突判定
-        for p in particles:
-            handle_wall_forces(p)
 
         # 計算された力に基づいて、全粒子の物理状態を更新
         for p in particles:

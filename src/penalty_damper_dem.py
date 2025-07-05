@@ -8,7 +8,7 @@ DT = 1e-4   # 極小時間
 UPDATES_PER_FRAME = 10  # 1フレームごとの計算回数
 PARTICLE_RADIUS_PX = 10 # 粒子の半径（ピクセル）
 PARTICLE_RADIUS_NORM = PARTICLE_RADIUS_PX / WIN_X   # 粒子の半径（正規化座標）
-NUM_PARTICLES = 1  # 粒子の数
+NUM_PARTICLES = 100  # 粒子の数
 
 # 物理状態変数
 GRAVITY = [0.0, -9.8]   # 重力
@@ -22,40 +22,6 @@ particles = []  # 粒子のリスト
 # FPS計算用の変数
 last_time, frame_count, fps = 0, 0, 0
 sum_fps, update_count, average_fps = 0, 0, 0.0
-
-# 空間ハッシュグリッドのクラス
-class SpatialHashGrid:
-    def __init__(self, cell_size):
-        self.cell_size = cell_size
-        self.grid = {}
-
-    def _get_cell_coords(self, pos):
-        # 粒子の位置からグリッド座標を計算
-        return int(pos[0] / self.cell_size), int(pos[1] /self.cell_size)
-
-    def clear(self):
-        # 新しいフレームのためにグリッドを空にする
-        self.grid.clear()
-
-    def insert(self, particle):
-        # 粒子をグリッドに追加する
-        coords = self._get_cell_coords(particle.pos)
-        if coords not in self.grid:
-            self.grid[coords] = []
-
-        self.grid[coords].append(particle)
-
-    def get_potential_colliders(self, particle):
-        """指定された粒子の衝突候補を返す"""
-        coords = self._get_cell_coords(particle.pos)
-        potential_colliders = []
-        # 自身と隣接する8つのセルをチェック
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                check_coords = (coords[0] + dx, coords[1] + dy) # タプル
-                if check_coords in self.grid:
-                    potential_colliders.extend(self.grid[check_coords]) # 複数の要素を追加する
-        return potential_colliders
 
 # 粒子のクラス
 class Particle:
@@ -150,15 +116,12 @@ def particles_init():
         p = Particle(x, y, vx, vy, PARTICLE_RADIUS_NORM, color, canvas)
         particles.append(p)
 
-def handle_particle_collisions(grid):
-    """ グリッドを使って衝突を処理する"""
-    for p1 in particles:
-        # p1の周辺にいる粒子（衝突候補）を取得
-        potential_colliders = grid.get_potential_colliders(p1)
-        for p2 in potential_colliders:
-            # 同じペアを二回計算しないようにIDでチェック
-            if p1.id >= p2.id:
-                continue
+def handle_particle_collisions():
+    """ すべての粒子の衝突を計算"""
+    for i in range(NUM_PARTICLES):
+        for j in range(i + 1, NUM_PARTICLES):
+            p1 = particles[i]
+            p2 = particles[j]
 
             dist_x = p2.pos[0] - p1.pos[0]
             dist_y = p2.pos[1] - p1.pos[1]
@@ -217,13 +180,8 @@ def main_loop():
             p.force = [0.0, 0.0]
             p.apply_force([p.mass * GRAVITY[0], p.mass * GRAVITY[1]])
 
-        # 毎フレーム、グリッドを更新する
-        grid.clear()
-        for p in particles:
-            grid.insert(p)
-
         # 粒子間の衝突力を計算して加える
-        handle_particle_collisions(grid)
+        handle_particle_collisions()
 
         # 計算された力に基づいて、全粒子の物理状態を更新
         for p in particles:
@@ -246,8 +204,6 @@ window.resizable(False, False)
 canvas = tk.Canvas(window, width=WIN_X, height=WIN_Y, bg="#4D4D4D", highlightthickness=0)
 canvas.pack()
 
-# グリッドを生成。セルのサイズは粒子の直径が目安
-grid = SpatialHashGrid(cell_size= PARTICLE_RADIUS_NORM * 2)
 # 初期化
 particles_init()
 # メインループを開始
